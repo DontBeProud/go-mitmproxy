@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/lqqyt2423/go-mitmproxy/proxy"
+	"github.com/DontBeProud/go-mitmproxy/proxy"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -114,4 +114,3 @@ func formatCiphers(ids []uint16) string {
 	}
 	return "[" + strings.Join(parts, " ") + "]"
 }
-

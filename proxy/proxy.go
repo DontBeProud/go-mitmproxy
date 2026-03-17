@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/lqqyt2423/go-mitmproxy/cert"
-	"github.com/lqqyt2423/go-mitmproxy/internal/helper"
+	"github.com/DontBeProud/go-mitmproxy/cert"
+	"github.com/DontBeProud/go-mitmproxy/internal/helper"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -29,12 +29,12 @@ type Proxy struct {
 	Version string
 	Addons  []Addon
 
-	entry            *entry
-	attacker         *attacker
-	webSocketHandler *webSocketHandler
-	shouldIntercept  func(req *http.Request) bool              // req is received by proxy.server
-	upstreamProxy    func(req *http.Request) (*url.URL, error) // req is received by proxy.server, not client request
-	authProxy        func(res http.ResponseWriter, req *http.Request) (bool, error)
+	entry               *entry
+	attacker            *attacker
+	webSocketHandler    *webSocketHandler
+	shouldIntercept     func(req *http.Request) bool              // req is received by proxy.server
+	upstreamProxy       func(req *http.Request) (*url.URL, error) // req is received by proxy.server, not client request
+	authProxy           func(res http.ResponseWriter, req *http.Request) (bool, error)
 	serverTlsConfigFunc func(*tls.ClientHelloInfo) *tls.Config
 }
 
@@ -148,4 +148,3 @@ func (proxy *Proxy) WithServerTlsConfig(fn func(*tls.ClientHelloInfo) *tls.Confi
 	proxy.serverTlsConfigFunc = fn
 	return proxy
 }
-

@@ -14,8 +14,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/lqqyt2423/go-mitmproxy/addon"
-	"github.com/lqqyt2423/go-mitmproxy/proxy"
+	"github.com/DontBeProud/go-mitmproxy/addon"
+	"github.com/DontBeProud/go-mitmproxy/proxy"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -137,4 +137,3 @@ func registerRoutes(r *addon.RouterAddon) {
 		log.Infof("[SSE] event=%q id=%s data_len=%d", ev.Event, ev.ID, len(ev.Data))
 	})
 }
-

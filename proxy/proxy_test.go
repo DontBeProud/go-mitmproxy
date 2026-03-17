@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lqqyt2423/go-mitmproxy/cert"
+	"github.com/DontBeProud/go-mitmproxy/cert"
 )
 
 func handleError(t *testing.T, err error) {

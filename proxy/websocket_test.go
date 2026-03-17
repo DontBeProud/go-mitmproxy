@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DontBeProud/go-mitmproxy/cert"
 	"github.com/gorilla/websocket"
-	"github.com/lqqyt2423/go-mitmproxy/cert"
 	log "github.com/sirupsen/logrus"
 )
 

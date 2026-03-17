@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/lqqyt2423/go-mitmproxy/proxy"
+	"github.com/DontBeProud/go-mitmproxy/proxy"
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 )
@@ -30,15 +30,15 @@ const messageVersion = 2
 type messageType byte
 
 const (
-	messageTypeConn            messageType = 0
-	messageTypeConnClose       messageType = 5
-	messageTypeRequest         messageType = 1
-	messageTypeRequestBody     messageType = 2
-	messageTypeResponse        messageType = 3
-	messageTypeResponseBody    messageType = 4
-	messageTypeWebSocketStart  messageType = 6
+	messageTypeConn             messageType = 0
+	messageTypeConnClose        messageType = 5
+	messageTypeRequest          messageType = 1
+	messageTypeRequestBody      messageType = 2
+	messageTypeResponse         messageType = 3
+	messageTypeResponseBody     messageType = 4
+	messageTypeWebSocketStart   messageType = 6
 	messageTypeWebSocketMessage messageType = 7
-	messageTypeWebSocketEnd    messageType = 8
+	messageTypeWebSocketEnd     messageType = 8
 
 	messageTypeChangeRequest  messageType = 11
 	messageTypeChangeResponse messageType = 12
@@ -47,9 +47,9 @@ const (
 
 	messageTypeChangeBreakPointRules messageType = 21
 
-	messageTypeSSEStart        messageType = 30
-	messageTypeSSEMessage      messageType = 31
-	messageTypeSSEEnd          messageType = 32
+	messageTypeSSEStart   messageType = 30
+	messageTypeSSEMessage messageType = 31
+	messageTypeSSEEnd     messageType = 32
 )
 
 var allMessageTypes = []messageType{

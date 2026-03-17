@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"errors"
-	"github.com/lqqyt2423/go-mitmproxy/proxy"
+	"github.com/DontBeProud/go-mitmproxy/proxy"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strings"

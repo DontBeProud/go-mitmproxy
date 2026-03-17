@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/lqqyt2423/go-mitmproxy/proxy"
+	"github.com/DontBeProud/go-mitmproxy/proxy"
 )
 
 func newTestFlow(method, host, path string) *proxy.Flow {
@@ -411,4 +411,3 @@ func TestFirstMatchWins(t *testing.T) {
 		t.Fatalf("first match should win, got %q", result)
 	}
 }
-
