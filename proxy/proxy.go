@@ -35,6 +35,7 @@ type Proxy struct {
 	shouldIntercept  func(req *http.Request) bool              // req is received by proxy.server
 	upstreamProxy    func(req *http.Request) (*url.URL, error) // req is received by proxy.server, not client request
 	authProxy        func(res http.ResponseWriter, req *http.Request) (bool, error)
+	serverTlsConfigFunc func(*tls.ClientHelloInfo) *tls.Config
 }
 
 // proxy.server req context key
@@ -137,3 +138,14 @@ func (proxy *Proxy) getUpstreamConn(ctx context.Context, req *http.Request) (net
 func (proxy *Proxy) SetAuthProxy(fn func(res http.ResponseWriter, req *http.Request) (bool, error)) {
 	proxy.authProxy = fn
 }
+
+// WithServerTlsConfig sets a factory function that returns the tls.Config used when
+// connecting to upstream servers. The function receives the client's ClientHelloInfo
+// so callers can mirror TLS parameters (e.g. to bypass JA3 fingerprinting) or
+// substitute a custom implementation such as uTLS.
+// Returns the Proxy for chaining.
+func (proxy *Proxy) WithServerTlsConfig(fn func(*tls.ClientHelloInfo) *tls.Config) *Proxy {
+	proxy.serverTlsConfigFunc = fn
+	return proxy
+}
+

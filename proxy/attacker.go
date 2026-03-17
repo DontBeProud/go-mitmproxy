@@ -203,27 +203,32 @@ func (a *attacker) serverTlsHandshake(ctx context.Context, connCtx *ConnContext)
 	clientHello := connCtx.ClientConn.clientHello
 	serverConn := connCtx.ServerConn
 
-	serverTlsConfig := &tls.Config{
-		InsecureSkipVerify: proxy.Opts.SslInsecure,
-		KeyLogWriter:       helper.GetTlsKeyLogWriter(),
-		ServerName:         clientHello.ServerName,
-		NextProtos:         clientHello.SupportedProtos,
-		// CurvePreferences:   clientHello.SupportedCurves, // todo: 如果打开会出错
-		CipherSuites: clientHello.CipherSuites,
-	}
-	if len(clientHello.SupportedVersions) > 0 {
-		minVersion := clientHello.SupportedVersions[0]
-		maxVersion := clientHello.SupportedVersions[0]
-		for _, version := range clientHello.SupportedVersions {
-			if version < minVersion {
-				minVersion = version
-			}
-			if version > maxVersion {
-				maxVersion = version
-			}
+	var serverTlsConfig *tls.Config
+	if proxy.serverTlsConfigFunc != nil {
+		serverTlsConfig = proxy.serverTlsConfigFunc(clientHello)
+	} else {
+		serverTlsConfig = &tls.Config{
+			InsecureSkipVerify: proxy.Opts.SslInsecure,
+			KeyLogWriter:       helper.GetTlsKeyLogWriter(),
+			ServerName:         clientHello.ServerName,
+			NextProtos:         clientHello.SupportedProtos,
+			// CurvePreferences:   clientHello.SupportedCurves, // todo: 如果打开会出错
+			CipherSuites: clientHello.CipherSuites,
 		}
-		serverTlsConfig.MinVersion = minVersion
-		serverTlsConfig.MaxVersion = maxVersion
+		if len(clientHello.SupportedVersions) > 0 {
+			minVersion := clientHello.SupportedVersions[0]
+			maxVersion := clientHello.SupportedVersions[0]
+			for _, version := range clientHello.SupportedVersions {
+				if version < minVersion {
+					minVersion = version
+				}
+				if version > maxVersion {
+					maxVersion = version
+				}
+			}
+			serverTlsConfig.MinVersion = minVersion
+			serverTlsConfig.MaxVersion = maxVersion
+		}
 	}
 	serverTlsConn := tls.Client(serverConn.Conn, serverTlsConfig)
 	serverConn.tlsConn = serverTlsConn
