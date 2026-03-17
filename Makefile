@@ -21,3 +21,7 @@ test:
 .PHONY: dev
 dev:
 	go run $(shell ls cmd/go-mitmproxy/*.go | grep -v _test.go)
+
+.PHONY: sync-upstream
+sync-upstream:
+	bash scripts/sync-upstream.sh
