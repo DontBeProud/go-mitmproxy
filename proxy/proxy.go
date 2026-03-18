@@ -13,15 +13,42 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// ServerTLSHandshakeFunc is the signature for a pluggable outbound TLS handshake.
+//
+//   - rawConn     – the already-established TCP connection to the upstream server
+//   - serverName  – SNI from the browser's ClientHello
+//   - clientHello – the full ClientHello received from the browser (nil in lazy mode)
+//
+// The function must complete the TLS handshake and return:
+//   - a net.Conn wrapping rawConn with TLS applied
+//   - the resulting *tls.ConnectionState (needed for ALPN negotiation and addons)
+//   - any error
+//
+// This keeps the proxy library free of any specific TLS fingerprinting dependency.
+// Supply an implementation via Options.ServerTLSHandshake or WithServerTLSHandshake.
+type ServerTLSHandshakeFunc func(
+	ctx context.Context,
+	rawConn net.Conn,
+	serverName string,
+	clientHello *tls.ClientHelloInfo,
+) (net.Conn, *tls.ConnectionState, error)
+
 type Options struct {
 	Debug             int
 	Addr              string
 	StreamLargeBodies int64 // 当请求或响应体大于此字节时，转为 stream 模式
 	SslInsecure       bool
 	CaRootPath        string
-	NewCaFunc         func() (cert.CA, error) //创建 Ca 的函数
+	NewCaFunc         func() (cert.CA, error) // 创建 Ca 的函数
 	Upstream          string
 	LogFilePath       string // Path to write logs to file
+
+	// ServerTLSHandshake, when non-nil, replaces the default crypto/tls outbound
+	// TLS handshake with a caller-supplied implementation.
+	// Typical use: inject a uTLS (bogdanfinn/utls or refraction-networking/utls)
+	// handshake to mimic a specific browser's TLS/JA3 fingerprint.
+	// Can also be set after NewProxy via WithServerTLSHandshake.
+	ServerTLSHandshake ServerTLSHandshakeFunc
 }
 
 type Proxy struct {
@@ -32,8 +59,8 @@ type Proxy struct {
 	entry               *entry
 	attacker            *attacker
 	webSocketHandler    *webSocketHandler
-	shouldIntercept     func(req *http.Request) bool              // req is received by proxy.server
-	upstreamProxy       func(req *http.Request) (*url.URL, error) // req is received by proxy.server, not client request
+	shouldIntercept     func(req *http.Request) bool
+	upstreamProxy       func(req *http.Request) (*url.URL, error)
 	authProxy           func(res http.ResponseWriter, req *http.Request) (bool, error)
 	serverTlsConfigFunc func(*tls.ClientHelloInfo) *tls.Config
 }
@@ -86,12 +113,32 @@ func (proxy *Proxy) Shutdown(ctx context.Context) error {
 	return proxy.entry.shutdown(ctx)
 }
 
-func (proxy *Proxy) GetCertificate() x509.Certificate {
-	return *proxy.attacker.ca.GetRootCA()
+// WithServerTLSHandshake sets a pluggable outbound TLS handshake function and
+// returns the Proxy for chaining.  When set, the proxy calls fn instead of the
+// built-in crypto/tls handshake for every HTTPS upstream connection, allowing
+// callers to substitute uTLS or any other TLS implementation without this library
+// importing it.
+//
+// Example (bogdanfinn/utls, Chrome 146 fingerprint):
+//
+//	proxy.WithServerTLSHandshake(func(ctx context.Context, raw net.Conn, sni string, _ *tls.ClientHelloInfo) (net.Conn, *tls.ConnectionState, error) {
+//	    uc := utls.UClient(raw, &utls.Config{ServerName: sni, InsecureSkipVerify: false}, utls.HelloChrome_146)
+//	    if err := uc.HandshakeContext(ctx); err != nil { return nil, nil, err }
+//	    st := uc.ConnectionState()
+//	    return uc, &st, nil
+//	})
+func (proxy *Proxy) WithServerTLSHandshake(fn ServerTLSHandshakeFunc) *Proxy {
+	proxy.Opts.ServerTLSHandshake = fn
+	return proxy
 }
 
-func (proxy *Proxy) GetCertificateByCN(commonName string) (*tls.Certificate, error) {
-	return proxy.attacker.ca.GetCert(commonName)
+// WithServerTlsConfig sets a factory that returns the *tls.Config used when
+// connecting to upstream servers via the built-in crypto/tls path.
+// Deprecated: prefer WithServerTLSHandshake for full control over the handshake.
+// Returns the Proxy for chaining.
+func (proxy *Proxy) WithServerTlsConfig(fn func(*tls.ClientHelloInfo) *tls.Config) *Proxy {
+	proxy.serverTlsConfigFunc = fn
+	return proxy
 }
 
 func (proxy *Proxy) SetShouldInterceptRule(rule func(req *http.Request) bool) {
@@ -139,12 +186,10 @@ func (proxy *Proxy) SetAuthProxy(fn func(res http.ResponseWriter, req *http.Requ
 	proxy.authProxy = fn
 }
 
-// WithServerTlsConfig sets a factory function that returns the tls.Config used when
-// connecting to upstream servers. The function receives the client's ClientHelloInfo
-// so callers can mirror TLS parameters (e.g. to bypass JA3 fingerprinting) or
-// substitute a custom implementation such as uTLS.
-// Returns the Proxy for chaining.
-func (proxy *Proxy) WithServerTlsConfig(fn func(*tls.ClientHelloInfo) *tls.Config) *Proxy {
-	proxy.serverTlsConfigFunc = fn
-	return proxy
+func (proxy *Proxy) GetCertificate() x509.Certificate {
+	return *proxy.attacker.ca.GetRootCA()
+}
+
+func (proxy *Proxy) GetCertificateByCN(commonName string) (*tls.Certificate, error) {
+	return proxy.attacker.ca.GetCert(commonName)
 }

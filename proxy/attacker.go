@@ -203,6 +203,41 @@ func (a *attacker) serverTlsHandshake(ctx context.Context, connCtx *ConnContext)
 	clientHello := connCtx.ClientConn.clientHello
 	serverConn := connCtx.ServerConn
 
+	// ── pluggable TLS handshake (e.g. uTLS / bogdanfinn) ──────────────────────
+	// When Options.ServerTLSHandshake is set, delegate the entire outbound TLS
+	// handshake to the caller.  This is the recommended path for spoofing JA3/
+	// JA4 fingerprints: the library stays dependency-free and callers inject
+	// their chosen implementation.
+	if proxy.Opts.ServerTLSHandshake != nil {
+		sni := ""
+		if clientHello != nil {
+			sni = clientHello.ServerName
+		}
+		tlsConn, state, err := proxy.Opts.ServerTLSHandshake(ctx, serverConn.Conn, sni, clientHello)
+		if err != nil {
+			return err
+		}
+		serverConn.tlsConn = tlsConn
+		serverConn.tlsState = state
+		for _, addon := range proxy.Addons {
+			addon.TlsEstablishedServer(connCtx)
+		}
+		serverConn.client = &http.Client{
+			Transport: &http.Transport{
+				DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					return serverConn.tlsConn, nil
+				},
+				ForceAttemptHTTP2:  true,
+				DisableCompression: true,
+			},
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
+		return nil
+	}
+
+	// ── default crypto/tls handshake ──────────────────────────────────────────
 	var serverTlsConfig *tls.Config
 	if proxy.serverTlsConfigFunc != nil {
 		serverTlsConfig = proxy.serverTlsConfigFunc(clientHello)
@@ -244,13 +279,12 @@ func (a *attacker) serverTlsHandshake(ctx context.Context, connCtx *ConnContext)
 	serverConn.client = &http.Client{
 		Transport: &http.Transport{
 			DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return serverTlsConn, nil
+				return serverConn.tlsConn, nil
 			},
 			ForceAttemptHTTP2:  true,
-			DisableCompression: true, // To get the original response from the server, set Transport.DisableCompression to true.
+			DisableCompression: true,
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			// 禁止自动重定向
 			return http.ErrUseLastResponse
 		},
 	}
