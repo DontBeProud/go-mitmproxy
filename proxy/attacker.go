@@ -104,17 +104,24 @@ func (a *attacker) serveConn(clientTlsConn *tls.Conn, connCtx *ConnContext) {
 	connCtx.ClientConn.NegotiatedProtocol = clientTlsConn.ConnectionState().NegotiatedProtocol
 
 	if connCtx.ClientConn.NegotiatedProtocol == "h2" && connCtx.ServerConn != nil {
-		connCtx.ServerConn.client = &http.Client{
-			Transport: &http2.Transport{
-				DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
-					return connCtx.ServerConn.tlsConn, nil
+		// -- pluggable H2 client factory ------------------------------------
+		// When ServerH2ClientFactory is set, delegate H2 transport creation
+		// to the caller (e.g. to inject fhttp/http2 with Chrome SETTINGS).
+		if a.proxy.Opts.ServerH2ClientFactory != nil {
+			connCtx.ServerConn.client = a.proxy.Opts.ServerH2ClientFactory(connCtx.ServerConn.tlsConn)
+		} else {
+			connCtx.ServerConn.client = &http.Client{
+				Transport: &http2.Transport{
+					DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
+						return connCtx.ServerConn.tlsConn, nil
+					},
+					DisableCompression: true,
 				},
-				DisableCompression: true,
-			},
-			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				// 禁止自动重定向
-				return http.ErrUseLastResponse
-			},
+				CheckRedirect: func(req *http.Request, via []*http.Request) error {
+					// 禁止自动重定向
+					return http.ErrUseLastResponse
+				},
+			}
 		}
 
 		ctx := context.WithValue(context.Background(), connContextKey, connCtx)

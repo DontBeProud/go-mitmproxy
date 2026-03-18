@@ -49,6 +49,16 @@ type Options struct {
 	// handshake to mimic a specific browser's TLS/JA3 fingerprint.
 	// Can also be set after NewProxy via WithServerTLSHandshake.
 	ServerTLSHandshake ServerTLSHandshakeFunc
+
+	// ServerH2ClientFactory, when non-nil, replaces the default http2.Transport
+	// used for upstream HTTP/2 connections. The factory receives the already-established
+	// TLS connection (from ServerTLSHandshake or default handshake) and must return
+	// an *http.Client whose Transport speaks HTTP/2 over that connection.
+	//
+	// Typical use: inject a bogdanfinn/fhttp based transport to mimic Chrome's
+	// HTTP/2 SETTINGS / WINDOW_UPDATE / PRIORITY fingerprint.
+	// Can also be set after NewProxy via WithServerH2ClientFactory.
+	ServerH2ClientFactory func(tlsConn net.Conn) *http.Client
 }
 
 type Proxy struct {
@@ -129,6 +139,21 @@ func (proxy *Proxy) Shutdown(ctx context.Context) error {
 //	})
 func (proxy *Proxy) WithServerTLSHandshake(fn ServerTLSHandshakeFunc) *Proxy {
 	proxy.Opts.ServerTLSHandshake = fn
+	return proxy
+}
+
+// WithServerH2ClientFactory sets a pluggable HTTP/2 client factory and returns
+// the Proxy for chaining.  When set, the proxy calls fn instead of using the
+// built-in http2.Transport for every upstream HTTP/2 connection.
+//
+// The factory receives the already-established TLS connection (after the TLS
+// handshake is complete) and must return an *http.Client whose Transport speaks
+// HTTP/2 over that connection.
+//
+// Typical use: inject a bogdanfinn/fhttp based transport to mimic Chrome's
+// HTTP/2 SETTINGS / WINDOW_UPDATE / PRIORITY fingerprint.
+func (proxy *Proxy) WithServerH2ClientFactory(fn func(tlsConn net.Conn) *http.Client) *Proxy {
+	proxy.Opts.ServerH2ClientFactory = fn
 	return proxy
 }
 
