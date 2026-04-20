@@ -80,9 +80,15 @@ func newAttacker(proxy *Proxy) (*attacker, error) {
 		},
 	}
 
+	// Do NOT set NewWriteScheduler here.
+	// NewPriorityWriteScheduler (RFC 7540) has a known slice-aliasing bug in CloseStream:
+	// it copies n.q by value then passes &q to the pool, which zeroes the shared backing
+	// array.  n.q retains its original length, so Pop() returns a zero FrameWriteRequest
+	// with write==nil, causing a nil-pointer panic in startFrameWrite.
+	// The function is explicitly deprecated in x/net/http2 for exactly this reason.
+	// Omitting NewWriteScheduler lets x/net choose its default (RFC 9218) scheduler.
 	a.h2Server = &http2.Server{
 		MaxConcurrentStreams: 100, // todo: wait for remote server setting
-		NewWriteScheduler:    func() http2.WriteScheduler { return http2.NewPriorityWriteScheduler(nil) },
 	}
 
 	return a, nil
@@ -131,6 +137,12 @@ func (a *attacker) serveConn(clientTlsConn *tls.Conn, connCtx *ConnContext) {
 			cancel()
 		}()
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Errorf("h2Server.ServeConn panic: %v", r)
+					clientTlsConn.Close()
+				}
+			}()
 			a.h2Server.ServeConn(clientTlsConn, &http2.ServeConnOpts{
 				Context:    ctx,
 				Handler:    a,
